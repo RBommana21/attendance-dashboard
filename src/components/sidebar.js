@@ -9,7 +9,7 @@ export default function Sidebar() {
 
   const navItems = [
     { href: "/", label: "Dashboard", icon: Home },
-    { href: "/agent-details", label: "Agent Details", icon: Users },
+    { href: "/agent-details", label: "Live Report", icon: Users },
     { href: "/attendance-targets", label: "Attendance Targets", icon: Target },
     { href: "/agent-view", label: "Agent View", icon: User },
   ]
