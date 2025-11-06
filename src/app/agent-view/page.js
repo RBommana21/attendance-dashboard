@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { db } from "@/lib/firebase"
-import { collection, getDocs, query, where, orderBy, limit } from "firebase/firestore"
+import { collection, getDocs, query, where, limit, orderBy } from "firebase/firestore"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
@@ -17,12 +17,16 @@ export default function AgentView() {
   useEffect(() => {
     const fetchAgents = async () => {
       try {
+        console.log("[v0] Fetching agents...")
         const agentsCollection = collection(db, "agents")
         const agentsSnapshot = await getDocs(agentsCollection)
         const agentsList = agentsSnapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         }))
+
+
+        console.log("[v0] Agents fetched:", agentsList)
         setAgents(agentsList)
         setLoading(false)
       } catch (error) {
@@ -41,19 +45,31 @@ export default function AgentView() {
     const fetchAgentLogs = async () => {
       setLogsLoading(true)
       try {
+        console.log("[v0] Selected agent:", selectedAgent)
+        console.log("[v0] Querying logs for LDAP:", selectedAgent.LDAP)
+
         const logsCollection = collection(db, "attendanceLogs")
+
         const logsQuery = query(
           logsCollection,
-          where("ldap", "==", selectedAgent.LDAP + "@google.com"),
+          where("ldap", "==", selectedAgent.LDAP+"@google.com"),
           orderBy("datetime", "desc"),
           limit(5),
         )
+
+        console.log("[v0] Executing query...")
         const logsSnapshot = await getDocs(logsQuery)
-        console.log(logsSnapshot)
-        const logsList = logsSnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }))
+        console.log("[v0] Query returned", logsSnapshot.docs.length, "documents")
+
+        const logsList = logsSnapshot.docs.map((doc) => {
+          const data = doc.data()
+          console.log("[v0] Log document:", data)
+          return {
+            id: doc.id,
+            ...data,
+          }
+        })
+
         setAgentLogs(logsList)
         setLogsLoading(false)
       } catch (error) {
@@ -68,6 +84,29 @@ export default function AgentView() {
   const handleAgentSelect = (agentId) => {
     const agent = agents.find((a) => a.id === agentId)
     setSelectedAgent(agent)
+  }
+
+  const formatDate = (timestamp) => {
+    if (!timestamp) return "N/A"
+
+    let date
+    if (timestamp.toDate) {
+      // Firestore Timestamp
+      date = timestamp.toDate()
+    } else if (timestamp instanceof Date) {
+      date = timestamp
+    } else {
+      date = new Date(timestamp)
+    }
+
+    return date.toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    })
   }
 
   if (loading) {
@@ -89,7 +128,7 @@ export default function AgentView() {
           <SelectContent>
             {agents.map((agent) => (
               <SelectItem key={agent.id} value={agent.id}>
-                 {agent.LDAP}
+                {agent.AccessRights} ({agent.LDAP})
               </SelectItem>
             ))}
           </SelectContent>
@@ -144,8 +183,19 @@ export default function AgentView() {
                   {agentLogs.map((log) => (
                     <div key={log.id} className="border rounded-lg p-4 flex items-center justify-between">
                       <div className="flex-1">
-                        <p className="font-medium">{log.datetime_str}</p>
-                        <p className="text-sm text-muted-foreground">URL Type: {log.urlType}</p>
+                        <p className="font-medium">{formatDate(log.datetime)}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-sm text-muted-foreground">URL Type:</span>
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                              log.urlType === "Work"
+                                ? "bg-blue-500/20 text-blue-700"
+                                : "bg-purple-500/20 text-purple-700"
+                            }`}
+                          >
+                            {log.urlType}
+                          </span>
+                        </div>
                       </div>
                       <div className="flex gap-2">
                         <span
